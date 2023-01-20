@@ -1,0 +1,311 @@
+<html>
+
+<head>
+    <title>Hassans Image Captioning</title>
+    <link rel="stylesheet" href="bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootswatch/4.5.2/darkly/bootstrap.min.css" />
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.5.0/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.2/FileSaver.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.5.0/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.2/FileSaver.min.js"></script>
+    <script src="https://kit.fontawesome.com/29c58edae7.js" crossorigin="anonymous"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            document.getElementById("imagePreview").src = "https://universeofmemory.com/wp-content/uploads/2020/06/Man-Placeholder.png";
+        });
+
+
+        function createThumbnails() {
+            var input = document.getElementById("fileInput");
+            var container = document.getElementById("thumbnail-container");
+            var paginationContainer = document.querySelector(".pagination-container");
+            if (!paginationContainer) {
+                paginationContainer = document.createElement("div");
+                paginationContainer.classList.add("pagination-container");
+                paginationContainer.innerHTML = `
+      <nav aria-label="Page navigation example">
+        <ul class="pagination"></ul>
+      </nav>
+    `;
+                container.parentNode.appendChild(paginationContainer);
+            }
+            var thumbnailsPerPage = 40; // 4 rows * 10 images per row
+            var totalPages = Math.ceil(input.files.length / thumbnailsPerPage);
+            var paginationList = paginationContainer.querySelector(".pagination");
+            paginationList.innerHTML = "";
+            for (var i = 1; i <= totalPages; i++) {
+                var pageItem = document.createElement("li");
+                pageItem.classList.add("page-item");
+                var pageLink = document.createElement("a");
+                pageLink.classList.add("page-link");
+                pageLink.href = "#";
+                pageLink.textContent = i;
+                pageLink.addEventListener("click", function(e) {
+                    var pageNumber = e.target.textContent;
+                    paginateThumbnails(pageNumber);
+                });
+                pageItem.appendChild(pageLink);
+                paginationList.appendChild(pageItem);
+            }
+            paginationContainer.style.display = "block";
+            paginateThumbnails(1);
+        }
+
+
+
+        // Function to handle image upload
+        function handleUpload() {
+            // Get file input element
+            var input = document.getElementById("fileInput");
+            // Get the first image in the list
+            var image = input.files[0];
+            // Display the image in the preview
+            var preview = document.getElementById("imagePreview");
+            preview.src = URL.createObjectURL(image);
+            createThumbnails();
+        }
+
+
+        // Function to handle image navigation
+        var currentImageIndex = 0;
+
+        function handleNavigation(direction) {
+            // Get the file input element
+            var input = document.getElementById("fileInput");
+            // Get the caption input element
+            var captionInput = document.getElementById("captionInput");
+            // Save the current caption
+            var captions = JSON.parse(localStorage.getItem("captions")) || {};
+            captions[input.files[currentImageIndex].name] = captionInput.value;
+            localStorage.setItem("captions", JSON.stringify(captions));
+            // Update the current image index
+            if (direction === "next") {
+                currentImageIndex++;
+            } else if (direction === "prev") {
+                currentImageIndex--;
+            }
+            // Get the next image
+            var image = input.files[currentImageIndex];
+            // Display the image in the preview
+            var preview = document.getElementById("imagePreview");
+            preview.src = URL.createObjectURL(image);
+            // Load the caption for the image
+            captionInput.value = captions[image.name] || "";
+        }
+
+        // Function to handle download
+        // Function to handle download
+        function handleDownload() {
+            // Create a zip file with the images and captions
+            var zip = new JSZip();
+            // Get the file input element
+            var input = document.getElementById("fileInput");
+            // Get the captions
+            var captions = JSON.parse(localStorage.getItem("captions")) || {};
+            // Add the images and captions to the zip file
+            for (var i = 0; i < input.files.length; i++) {
+                var file = input.files[i];
+                var caption = captions[file.name] || "";
+                zip.file(file.name, file);
+                zip.file(file.name.replace(/.{0,4}$/, '') + ".txt", caption);
+            }
+            // Generate the zip file and prompt the user to download
+            zip.generateAsync({
+                    type: "blob"
+                })
+                .then(function(content) {
+                    // see FileSaver.js
+                    saveAs(content, "captions.zip");
+                });
+        }
+        document.onkeydown = (e) => {
+            e = e || window.event;
+            if (e.keyCode === 37) {
+                handleNavigation('prev')
+            } else if (e.keyCode === 39) {
+                handleNavigation('next')
+            }
+        }
+
+        function paginateThumbnails(currentPage) {
+            var input = document.getElementById("fileInput");
+            var container = document.getElementById("thumbnail-container");
+            var thumbnailsPerPage = 40; // 4 rows * 10 images per row
+            var startIndex = (currentPage - 1) * thumbnailsPerPage;
+            var endIndex = startIndex + thumbnailsPerPage;
+            container.innerHTML = "";
+            for (var i = startIndex; i < endIndex; i++) {
+                if (i >= input.files.length) {
+                    break;
+                }
+                var file = input.files[i];
+                var img = document.createElement("img");
+                img.src = URL.createObjectURL(file);
+                img.classList.add("img-thumbnail", "img-fluid");
+                img.style.width = "100px";
+                img.style.margin = "5px";
+                img.style.cursor = "pointer";
+                img.setAttribute("data-index", i);
+                img.addEventListener("click", function(e) {
+                    currentImageIndex = parseInt(e.target.getAttribute("data-index"));
+                    handleNavigation();
+                });
+                container.appendChild(img);
+            }
+        }
+        const refreshBtn = document.getElementById("refresh-btn");
+
+        function refreshbutton() {
+            var input = document.getElementById("fileInput");
+            var container = document.getElementById("thumbnail-container");
+            var paginationContainer = document.querySelector(".pagination-container");
+            input.value = "";
+            container.innerHTML = "";
+            paginationContainer.style.display = "none";
+            document.getElementById("imagePreview").src = "https://universeofmemory.com/wp-content/uploads/2020/06/Man-Placeholder.png";
+            document.getElementById("captionInput").value = "";
+            localStorage.clear();
+
+            createThumbnails();
+        };
+    </script>
+    <style>
+        body::-webkit-scrollbar {
+            width: 12px;
+            /* width of the entire scrollbar */
+        }
+        
+        body::-webkit-scrollbar-track {
+            background: #a3a3a3;
+            /* color of the tracking area */
+        }
+        
+        body::-webkit-scrollbar-thumb {
+            background-color: #a30303;
+            /* color of the scroll thumb */
+            border-radius: 20px;
+            /* roundness of the scroll thumb */
+            border: 3px solid #a30303;
+            /* creates padding around scroll thumb */
+        }
+        
+        .pagination::-webkit-scrollbar {
+            width: 0px!important;
+            height: 10px!important;
+            /* width of the entire scrollbar */
+        }
+        
+        .pagination::-webkit-scrollbar-track {
+            background: #a3a3a3!important;
+            /* color of the tracking area */
+        }
+        
+        .pagination::-webkit-scrollbar-thumb {
+            background-color: #a30303!important;
+            /* color of the scroll thumb */
+            /* roundness of the scroll thumb */
+            border: 3px solid #a30303!important;
+            /* creates padding around scroll thumb */
+        }
+        
+        .captionInput {
+            height: calc(6.5em + 0.75rem + 2px)!important;
+        }
+        
+        .pagination {
+            overflow-y: scroll;
+        }
+        
+        body {
+            animation: fadeInAnimation ease 3s animation-iteration-count: 1;
+            animation-fill-mode: forwards;
+        }
+        
+        @keyframes fadeInAnimation {
+            0% {
+                opacity: 0;
+            }
+            100% {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="row">
+            <div class="col-md-6 offset-md-3">
+                <div class="text-center">Welcome to Hassans Manual Captioner</div>
+                <div class="ntable-wrapper">
+                    <div class="text-center">
+                        <a href="https://discord.gg/sdmodelers" target="_blank" rel="nofollow noopener"><img alt="img" width="32px" height="32px" referrerpolicy="same-origin" src="https://icons.iconarchive.com/icons/papirus-team/papirus-apps/64/discord-icon.png?width=256&amp;s=f0e3a92cc6665b3dcbe9e3eae7e0656f9db62c74" title="img"></a>
+                        </td>
+                        <td>
+                            <a href="https://huggingface.co/hassanblend" target="_blank" rel="nofollow noopener"><img width="32px" height="32px" alt="img" referrerpolicy="same-origin" src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg" title="img"></a>
+                        </td>
+                        <td>
+                            <a href="https://www.patreon.com/sd_hassan/membership" target="_blank" rel="nofollow noopener"><img width="32px" height="32px" alt="img" referrerpolicy="same-origin" src="https://gcdn.thunderstore.io/live/repository/icons/HolloFox_TS-Patreon_Plugin-1.0.2.png.128x128_q95.png" title="img"></a>
+                        </td>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="fileInput">Select Images</label>
+                    <input type="file" class="form-control-file" id="fileInput" onchange="handleUpload()" multiple />
+                </div>
+                <div class="text-center">
+                    <img id="imagePreview" width="100%" class="img-fluid" />
+                    <br />
+                    <div class="form-group">
+                        <label for="captionInput">Caption</label>
+                        <input type="text" class="form-control" id="captionInput" placeholder="Enter a caption for the image" />
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-secondary" onclick="handleNavigation('prev')"><i class="fas fa-arrow-left"></i></button>
+                        <button class="btn btn-secondary" onclick="handleNavigation('next')"><i class="fas fa-arrow-right"></i></button>
+                        <button class="btn btn-danger" onclick="handleDownload()"><i class="fas fa-download"></i></button>
+                        <button class="btn btn-danger" onclick="refreshbutton()" id="refresh-btn"><i class="fas fa-sync"></i></button>
+
+                    </div>
+                    <div class="text-center">
+                        <div class="pagination-container text-center">
+                            <nav aria-label="Page navigation example text-center">
+                                <ul class="pagination text-center">
+                                    <li class="page-item text-center">
+                                        <a class="page-link" href="#" aria-label="Previous">
+                                            <span aria-hidden="true">&laquo;</span>
+                                        </a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="#">1</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="#">2</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="#">3</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="#" aria-label="Next">
+                                            <span aria-hidden="true">&raquo;</span>
+                                        </a>
+                                    </li>
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+        <div class="col-md-12" id="thumbnail-container">
+        </div>
+    </div>
+
+</body>
+
+</html>

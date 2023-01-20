@@ -1,0 +1,38 @@
+{
+    "name": "image-captioning",
+    "version": "1.0.0",
+    "main": "main.js",
+    "scripts": {
+        "start": "electron .",
+        "build": "electron-builder"
+    },
+    "devDependencies": {
+        "electron": "^11.0.0",
+        "electron-builder": "^22.9.0"
+    },
+    "dependencies": {
+        "bootstrap": "^4.5.2",
+        "jquery": "^3.5.1",
+        "popper.js": "^2.0.0"
+    },
+    "build": {
+        "appId": "com.example.imagecaptioning",
+        "productName": "Image Captioning",
+        "directories": {
+            "output": "build2"
+        },
+        "files": [
+            "index.html",
+            "main.js",
+            "styles.css",
+            "assets/**/*"
+        ],
+
+        "linux": {
+            "icon": "assets/icon.png"
+        }
+
+
+
+    }
+}

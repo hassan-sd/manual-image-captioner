@@ -19,5 +19,5 @@ This tool is to help those who'd rather manually caption images in batches with 
 
 
 # Usage
-* Download the prepacked application
+* Download the prepacked application from the releases section on the right
 * Run the application exe file which is a portable application for Windows only right now.

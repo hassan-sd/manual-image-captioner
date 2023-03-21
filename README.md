@@ -1,6 +1,8 @@
 # manual-image-captioner
 This tool is to help those who'd rather manually caption images in batches with ease
 
+* Patreon: https://www.patreon.com/sd_hassan
+
 # Features
 * Select large folder of images, thousands at a time are supported
 * Uses web local storage so you can resume from a folder you have used before (as long as you don't hit the red reset/refresh button)

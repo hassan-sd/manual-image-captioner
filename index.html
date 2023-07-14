@@ -13,7 +13,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.2/FileSaver.min.js"></script>
     <script src="https://kit.fontawesome.com/29c58edae7.js" crossorigin="anonymous"></script>
     <script>
-        document.addEventListener("DOMContentLoaded", function() {
+        document.addEventListener("DOMContentLoaded", function () {
             document.getElementById("imagePreview").src = "https://universeofmemory.com/wp-content/uploads/2020/06/Man-Placeholder.png";
         });
 
@@ -22,20 +22,26 @@
             var input = document.getElementById("fileInput");
             var container = document.getElementById("thumbnail-container");
             var paginationContainer = document.querySelector(".pagination-container");
+
             if (!paginationContainer) {
                 paginationContainer = document.createElement("div");
                 paginationContainer.classList.add("pagination-container");
                 paginationContainer.innerHTML = `
-      <nav aria-label="Page navigation example">
-        <ul class="pagination"></ul>
-      </nav>
-    `;
+          <nav aria-label="Page navigation example">
+            <ul class="pagination"></ul>
+          </nav>
+        `;
                 container.parentNode.appendChild(paginationContainer);
             }
+
+            // Filter out non-image files
+            var imageFiles = Array.from(input.files).filter(file => file.type.match('image.*'));
+
             var thumbnailsPerPage = 40; // 4 rows * 10 images per row
-            var totalPages = Math.ceil(input.files.length / thumbnailsPerPage);
+            var totalPages = Math.ceil(imageFiles.length / thumbnailsPerPage);
             var paginationList = paginationContainer.querySelector(".pagination");
             paginationList.innerHTML = "";
+
             for (var i = 1; i <= totalPages; i++) {
                 var pageItem = document.createElement("li");
                 pageItem.classList.add("page-item");
@@ -43,30 +49,88 @@
                 pageLink.classList.add("page-link");
                 pageLink.href = "#";
                 pageLink.textContent = i;
-                pageLink.addEventListener("click", function(e) {
+                pageLink.addEventListener("click", function (e) {
                     var pageNumber = e.target.textContent;
                     paginateThumbnails(pageNumber);
                 });
                 pageItem.appendChild(pageLink);
                 paginationList.appendChild(pageItem);
             }
+
             paginationContainer.style.display = "block";
             paginateThumbnails(1);
         }
 
 
 
+
+        // Function to read caption
+        function readCaption(file) {
+            return new Promise((resolve, reject) => {
+                var reader = new FileReader();
+
+                reader.onload = function (e) {
+                    var baseName = file.name.replace(/\.txt$/, '');
+                    var captions = JSON.parse(localStorage.getItem("captions")) || {};
+                    captions[baseName] = e.target.result;
+                    localStorage.setItem("captions", JSON.stringify(captions));
+                    resolve(e.target.result);
+                };
+
+                reader.onerror = reject;
+
+                reader.readAsText(file);
+            });
+        }
+
         // Function to handle image upload
-        function handleUpload() {
-            // Get file input element
+        // Function to handle image and caption upload
+        async function handleUpload() {
             var input = document.getElementById("fileInput");
-            // Get the first image in the list
-            var image = input.files[0];
-            // Display the image in the preview
-            var preview = document.getElementById("imagePreview");
-            preview.src = URL.createObjectURL(image);
+            var imageFound = false;
+
+            var imageFile;
+            var captionFile;
+
+            for (var i = 0; i < input.files.length; i++) {
+                var file = input.files[i];
+
+                // Check for image file
+                if (file.name.match(/.(jpg|jpeg|png|gif)$/i)) {
+                    imageFile = file;
+                    imageFound = true;
+                }
+
+                // Check for text file
+                else if (file.name.endsWith('.txt')) {
+                    captionFile = file;
+                }
+            }
+
+            if (imageFound) {
+                var preview = document.getElementById("imagePreview");
+                preview.src = URL.createObjectURL(imageFile);
+
+                // Get the base name of the image
+                var baseName = imageFile.name.replace(/\.[^/.]+$/, "");
+
+                // If a corresponding caption file exists, read it
+                if (captionFile && baseName === captionFile.name.replace('.txt', '')) {
+                    var reader = new FileReader();
+
+                    reader.onload = function (e) {
+                        // Display the caption in the text field
+                        document.getElementById("captionInput").value = e.target.result;
+                    };
+
+                    reader.readAsText(captionFile);
+                }
+            }
+
             createThumbnails();
         }
+
+
 
 
         // Function to handle image navigation
@@ -114,9 +178,9 @@
             }
             // Generate the zip file and prompt the user to download
             zip.generateAsync({
-                    type: "blob"
-                })
-                .then(function(content) {
+                type: "blob"
+            })
+                .then(function (content) {
                     // see FileSaver.js
                     saveAs(content, "captions.zip");
                 });
@@ -142,20 +206,24 @@
                     break;
                 }
                 var file = input.files[i];
-                var img = document.createElement("img");
-                img.src = URL.createObjectURL(file);
-                img.classList.add("img-thumbnail", "img-fluid");
-                img.style.width = "100px";
-                img.style.margin = "5px";
-                img.style.cursor = "pointer";
-                img.setAttribute("data-index", i);
-                img.addEventListener("click", function(e) {
-                    currentImageIndex = parseInt(e.target.getAttribute("data-index"));
-                    handleNavigation();
-                });
-                container.appendChild(img);
+                // Check if the file type is an image before creating a thumbnail
+                if (file.type.match('image.*')) {
+                    var img = document.createElement("img");
+                    img.src = URL.createObjectURL(file);
+                    img.classList.add("img-thumbnail", "img-fluid");
+                    img.style.width = "100px";
+                    img.style.margin = "5px";
+                    img.style.cursor = "pointer";
+                    img.setAttribute("data-index", i);
+                    img.addEventListener("click", function (e) {
+                        currentImageIndex = parseInt(e.target.getAttribute("data-index"));
+                        handleNavigation();
+                    });
+                    container.appendChild(img);
+                }
             }
         }
+
         const refreshBtn = document.getElementById("refresh-btn");
 
         function refreshbutton() {
@@ -177,12 +245,12 @@
             width: 12px;
             /* width of the entire scrollbar */
         }
-        
+
         body::-webkit-scrollbar-track {
             background: #a3a3a3;
             /* color of the tracking area */
         }
-        
+
         body::-webkit-scrollbar-thumb {
             background-color: #a30303;
             /* color of the scroll thumb */
@@ -191,43 +259,44 @@
             border: 3px solid #a30303;
             /* creates padding around scroll thumb */
         }
-        
+
         .pagination::-webkit-scrollbar {
-            width: 0px!important;
-            height: 10px!important;
+            width: 0px !important;
+            height: 10px !important;
             /* width of the entire scrollbar */
         }
-        
+
         .pagination::-webkit-scrollbar-track {
-            background: #a3a3a3!important;
+            background: #a3a3a3 !important;
             /* color of the tracking area */
         }
-        
+
         .pagination::-webkit-scrollbar-thumb {
-            background-color: #a30303!important;
+            background-color: #a30303 !important;
             /* color of the scroll thumb */
             /* roundness of the scroll thumb */
-            border: 3px solid #a30303!important;
+            border: 3px solid #a30303 !important;
             /* creates padding around scroll thumb */
         }
-        
+
         .captionInput {
-            height: calc(6.5em + 0.75rem + 2px)!important;
+            height: calc(6.5em + 0.75rem + 2px) !important;
         }
-        
+
         .pagination {
             overflow-y: scroll;
         }
-        
+
         body {
             animation: fadeInAnimation ease 3s animation-iteration-count: 1;
             animation-fill-mode: forwards;
         }
-        
+
         @keyframes fadeInAnimation {
             0% {
                 opacity: 0;
             }
+
             100% {
                 opacity: 1;
             }
@@ -242,13 +311,23 @@
                 <div class="text-center">Welcome to Hassans Manual Captioner</div>
                 <div class="ntable-wrapper">
                     <div class="text-center">
-                        <a href="https://discord.gg/sdmodelers" target="_blank" rel="nofollow noopener"><img alt="img" width="32px" height="32px" referrerpolicy="same-origin" src="https://icons.iconarchive.com/icons/papirus-team/papirus-apps/64/discord-icon.png?width=256&amp;s=f0e3a92cc6665b3dcbe9e3eae7e0656f9db62c74" title="img"></a>
+                        <a href="https://discord.gg/sdmodelers" target="_blank" rel="nofollow noopener"><img alt="img"
+                                width="32px" height="32px" referrerpolicy="same-origin"
+                                src="https://icons.iconarchive.com/icons/papirus-team/papirus-apps/64/discord-icon.png?width=256&amp;s=f0e3a92cc6665b3dcbe9e3eae7e0656f9db62c74"
+                                title="img"></a>
                         </td>
                         <td>
-                            <a href="https://huggingface.co/hassanblend" target="_blank" rel="nofollow noopener"><img width="32px" height="32px" alt="img" referrerpolicy="same-origin" src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg" title="img"></a>
+                            <a href="https://huggingface.co/hassanblend" target="_blank" rel="nofollow noopener"><img
+                                    width="32px" height="32px" alt="img" referrerpolicy="same-origin"
+                                    src="https://huggingface.co/front/assets/huggingface_logo-noborder.svg"
+                                    title="img"></a>
                         </td>
                         <td>
-                            <a href="https://www.patreon.com/sd_hassan/membership" target="_blank" rel="nofollow noopener"><img width="32px" height="32px" alt="img" referrerpolicy="same-origin" src="https://gcdn.thunderstore.io/live/repository/icons/HolloFox_TS-Patreon_Plugin-1.0.2.png.128x128_q95.png" title="img"></a>
+                            <a href="https://www.patreon.com/sd_hassan/membership" target="_blank"
+                                rel="nofollow noopener"><img width="32px" height="32px" alt="img"
+                                    referrerpolicy="same-origin"
+                                    src="https://gcdn.thunderstore.io/live/repository/icons/HolloFox_TS-Patreon_Plugin-1.0.2.png.128x128_q95.png"
+                                    title="img"></a>
                         </td>
                     </div>
                 </div>
@@ -261,13 +340,18 @@
                     <br />
                     <div class="form-group">
                         <label for="captionInput">Caption</label>
-                        <input type="text" class="form-control" id="captionInput" placeholder="Enter a caption for the image" />
+                        <input type="text" class="form-control" id="captionInput"
+                            placeholder="Enter a caption for the image" />
                     </div>
                     <div class="btn-group">
-                        <button class="btn btn-secondary" onclick="handleNavigation('prev')"><i class="fas fa-arrow-left"></i></button>
-                        <button class="btn btn-secondary" onclick="handleNavigation('next')"><i class="fas fa-arrow-right"></i></button>
-                        <button class="btn btn-danger" onclick="handleDownload()"><i class="fas fa-download"></i></button>
-                        <button class="btn btn-danger" onclick="refreshbutton()" id="refresh-btn"><i class="fas fa-sync"></i></button>
+                        <button class="btn btn-secondary" onclick="handleNavigation('prev')"><i
+                                class="fas fa-arrow-left"></i></button>
+                        <button class="btn btn-secondary" onclick="handleNavigation('next')"><i
+                                class="fas fa-arrow-right"></i></button>
+                        <button class="btn btn-danger" onclick="handleDownload()"><i
+                                class="fas fa-download"></i></button>
+                        <button class="btn btn-danger" onclick="refreshbutton()" id="refresh-btn"><i
+                                class="fas fa-sync"></i></button>
 
                     </div>
                     <div class="text-center">

@@ -18,26 +18,14 @@
         });
 
 
-        function createThumbnails() {
+        async function createThumbnails() {
             var input = document.getElementById("fileInput");
             var container = document.getElementById("thumbnail-container");
             var paginationContainer = document.querySelector(".pagination-container");
 
-            if (!paginationContainer) {
-                paginationContainer = document.createElement("div");
-                paginationContainer.classList.add("pagination-container");
-                paginationContainer.innerHTML = `
-          <nav aria-label="Page navigation example">
-            <ul class="pagination"></ul>
-          </nav>
-        `;
-                container.parentNode.appendChild(paginationContainer);
-            }
-
-            // Filter out non-image files
             var imageFiles = Array.from(input.files).filter(file => file.type.match('image.*'));
 
-            var thumbnailsPerPage = 40; // 4 rows * 10 images per row
+            var thumbnailsPerPage = 40;
             var totalPages = Math.ceil(imageFiles.length / thumbnailsPerPage);
             var paginationList = paginationContainer.querySelector(".pagination");
             paginationList.innerHTML = "";
@@ -58,13 +46,23 @@
             }
 
             paginationContainer.style.display = "block";
+
+            // load captions
+            for (let i = 0; i < imageFiles.length; i++) {
+                let captionFile = Array.from(input.files).find(file => file.name === imageFiles[i].name.replace(/\.[^/.]+$/, "") + ".txt");
+                if (captionFile) {
+                    let caption = await readCaption(captionFile);
+                    var captions = JSON.parse(localStorage.getItem("captions")) || {};
+                    captions[imageFiles[i].name] = caption;
+                    localStorage.setItem("captions", JSON.stringify(captions));
+                }
+            }
+
             paginateThumbnails(1);
         }
 
 
 
-
-        // Function to read caption
         function readCaption(file) {
             return new Promise((resolve, reject) => {
                 var reader = new FileReader();
@@ -83,47 +81,35 @@
             });
         }
 
-        // Function to handle image upload
-        // Function to handle image and caption upload
         async function handleUpload() {
             var input = document.getElementById("fileInput");
             var imageFound = false;
 
-            var imageFile;
-            var captionFile;
+            var imageFiles = Array.from(input.files).filter(file => file.type.match('image.*'));
+            var captionFiles = Array.from(input.files).filter(file => file.name.endsWith('.txt'));
 
-            for (var i = 0; i < input.files.length; i++) {
-                var file = input.files[i];
+            // Build a map of base names to caption files
+            var captionFileMap = captionFiles.reduce((map, file) => {
+                var baseName = file.name.replace('.txt', '');
+                map[baseName] = file;
+                return map;
+            }, {});
 
-                // Check for image file
-                if (file.name.match(/.(jpg|jpeg|png|gif)$/i)) {
-                    imageFile = file;
-                    imageFound = true;
-                }
-
-                // Check for text file
-                else if (file.name.endsWith('.txt')) {
-                    captionFile = file;
-                }
-            }
-
-            if (imageFound) {
-                var preview = document.getElementById("imagePreview");
-                preview.src = URL.createObjectURL(imageFile);
-
-                // Get the base name of the image
+            for (var i = 0; i < imageFiles.length; i++) {
+                var imageFile = imageFiles[i];
                 var baseName = imageFile.name.replace(/\.[^/.]+$/, "");
 
-                // If a corresponding caption file exists, read it
-                if (captionFile && baseName === captionFile.name.replace('.txt', '')) {
-                    var reader = new FileReader();
+                if (captionFileMap[baseName]) {
+                    var captionFile = captionFileMap[baseName];
+                    await readCaption(captionFile);
+                }
 
-                    reader.onload = function (e) {
-                        // Display the caption in the text field
-                        document.getElementById("captionInput").value = e.target.result;
-                    };
-
-                    reader.readAsText(captionFile);
+                // Display the first image
+                if (i === 0) {
+                    var preview = document.getElementById("imagePreview");
+                    preview.src = URL.createObjectURL(imageFile);
+                    var captions = JSON.parse(localStorage.getItem("captions")) || {};
+                    document.getElementById("captionInput").value = captions[baseName] || "";
                 }
             }
 
@@ -133,50 +119,55 @@
 
 
 
-        // Function to handle image navigation
+
         var currentImageIndex = 0;
 
         function handleNavigation(direction) {
-            // Get the file input element
             var input = document.getElementById("fileInput");
-            // Get the caption input element
+            var imageFiles = Array.from(input.files).filter(file => file.type.match('image.*'));
             var captionInput = document.getElementById("captionInput");
-            // Save the current caption
+
             var captions = JSON.parse(localStorage.getItem("captions")) || {};
-            captions[input.files[currentImageIndex].name] = captionInput.value;
+            var currentImageFile = imageFiles[currentImageIndex];
+
+            if (!currentImageFile) {
+                return;
+            }
+
+            // Save the current caption before navigating
+            captions[currentImageFile.name] = captionInput.value;
             localStorage.setItem("captions", JSON.stringify(captions));
-            // Update the current image index
-            if (direction === "next") {
+
+            if (direction === "next" && currentImageIndex < imageFiles.length - 1) {
                 currentImageIndex++;
-            } else if (direction === "prev") {
+            } else if (direction === "prev" && currentImageIndex > 0) {
                 currentImageIndex--;
             }
-            // Get the next image
-            var image = input.files[currentImageIndex];
-            // Display the image in the preview
+
+            var image = imageFiles[currentImageIndex];
+
             var preview = document.getElementById("imagePreview");
             preview.src = URL.createObjectURL(image);
-            // Load the caption for the image
+
             captionInput.value = captions[image.name] || "";
         }
 
-        // Function to handle download
-        // Function to handle download
+
         function handleDownload() {
-            // Create a zip file with the images and captions
+
             var zip = new JSZip();
-            // Get the file input element
+
             var input = document.getElementById("fileInput");
-            // Get the captions
+
             var captions = JSON.parse(localStorage.getItem("captions")) || {};
-            // Add the images and captions to the zip file
+
             for (var i = 0; i < input.files.length; i++) {
                 var file = input.files[i];
                 var caption = captions[file.name] || "";
                 zip.file(file.name, file);
                 zip.file(file.name.replace(/.{0,4}$/, '') + ".txt", caption);
             }
-            // Generate the zip file and prompt the user to download
+
             zip.generateAsync({
                 type: "blob"
             })
@@ -197,32 +188,34 @@
         function paginateThumbnails(currentPage) {
             var input = document.getElementById("fileInput");
             var container = document.getElementById("thumbnail-container");
-            var thumbnailsPerPage = 40; // 4 rows * 10 images per row
+            var thumbnailsPerPage = 40;
             var startIndex = (currentPage - 1) * thumbnailsPerPage;
             var endIndex = startIndex + thumbnailsPerPage;
+
+            var imageFiles = Array.from(input.files).filter(file => file.type.match('image.*'));
             container.innerHTML = "";
+
             for (var i = startIndex; i < endIndex; i++) {
-                if (i >= input.files.length) {
+                if (i >= imageFiles.length) {
                     break;
                 }
-                var file = input.files[i];
-                // Check if the file type is an image before creating a thumbnail
-                if (file.type.match('image.*')) {
-                    var img = document.createElement("img");
-                    img.src = URL.createObjectURL(file);
-                    img.classList.add("img-thumbnail", "img-fluid");
-                    img.style.width = "100px";
-                    img.style.margin = "5px";
-                    img.style.cursor = "pointer";
-                    img.setAttribute("data-index", i);
-                    img.addEventListener("click", function (e) {
-                        currentImageIndex = parseInt(e.target.getAttribute("data-index"));
-                        handleNavigation();
-                    });
-                    container.appendChild(img);
-                }
+                var file = imageFiles[i];
+                var img = document.createElement("img");
+                img.src = URL.createObjectURL(file);
+                img.classList.add("img-thumbnail", "img-fluid");
+                img.style.width = "100px";
+                img.style.margin = "5px";
+                img.style.cursor = "pointer";
+                img.setAttribute("data-index", i);
+                img.setAttribute("data-filename", file.name); // store filename in attribute
+                img.addEventListener("click", function (e) {
+                    currentImageIndex = parseInt(e.target.getAttribute("data-index"));
+                    handleNavigation();
+                });
+                container.appendChild(img);
             }
         }
+
 
         const refreshBtn = document.getElementById("refresh-btn");
 
@@ -389,7 +382,6 @@
         <div class="col-md-12" id="thumbnail-container">
         </div>
     </div>
-
 </body>
 
 </html>
